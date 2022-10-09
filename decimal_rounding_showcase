@@ -1,0 +1,254 @@
+#!/bin/python3
+
+"""
+Program to showcase number implementations and programming techniques.
+
+
+test: float
+    answer: 4675.77487468462
+
+test: float * 100
+    answer: 467577.487468462
+
+test: rational
+    answer: 4675.77487468462 (4601663842920868374646990847,984150000000000000000000)
+
+test: rational * 100
+    answer: 467577.487468462 (4601663842920868374646990847,9841500000000000000000)
+
+test: int_range
+    answer: 4660:4690
+
+test: int_range * 100
+    answer: 467323:467352
+
+test: int_range * 10000
+    answer: 46757732:46757763
+
+rational: 467577.487468462 (4601663842920868374646990847,9841500000000000000000) int_range: 467323:467352
+
+"""
+import math
+from struct import pack
+from collections import defaultdict
+
+def main():
+    test( "float", float )
+    test( "float * 100", lambda x: x*100.0 )
+    test( "rational", rational )
+    test( "rational * 100", lambda x: rational(x*100) )
+    test( "int_range", int_range )
+    test( "int_range * 100",lambda x: int_range(x*100) )
+    test( "int_range * 10000",lambda x: int_range(x*10000) )
+    for seed in sample_seeds_with_errors:
+        a=test( "rational * 100", lambda x: rational(x*100),seed )
+        b=test( "int_range * 100",lambda x: int_range(x*100),seed )
+        c=a.a/a.b
+        if False ==(  b.min<=c and b.max>=c):
+            print("rational:",a,"int_range:",b)
+
+
+
+
+def test( name, number, seed=3580 ):
+
+    accounts      = defaultdict( list )
+    comission     = number( 50 )
+    def calc_interest(x):
+        # 4% interest rate
+        return x * number(4) / number(1200)
+
+    def random_transactions( n ):
+        from random import Random
+        rng = Random(seed)
+        for _ in range(n):
+            account = rng.randint( 0, 10 )
+            amount  = number( rng.randint( 1, 1000 ) )
+            accion  = rng.choice( (deposit,withdraw) )
+            yield accion(account,amount)
+
+    def deposit(account, amount):
+        saldo = sum(accounts[account],number(0))
+
+
+        if saldo + amount >= comission:
+            accounts[account].append(amount)
+            accounts[account].append(-comission)
+            return True
+        return False
+
+    def withdraw(account, amount):
+        saldo = sum(accounts[account],number(0))
+
+
+
+        if saldo > amount+comission:
+            accounts[account].append(-amount)
+            accounts[account].append(-comission)
+            return True
+        return False
+
+
+    summary = []
+    for i in range(10):
+        reward =  sum(  ( comission for _ in random_transactions( 10 ) ), number(0) )
+        cost = number(0)
+        for k,v in accounts.items():
+            total = sum( v, number(0) )
+            interest = calc_interest( total )
+            cost     += interest
+            v.append( interest )
+        summary.append((cost,reward))
+    subtotals = [ reward - cost  for cost, reward in summary ]
+    answer = sum( subtotals, number(0) ) 
+    print("test:", name)
+    print("\tanswer:", answer)
+    print()
+    return answer
+
+
+class rational:
+    def __init__(self,a,b=1):
+        gcd = math.gcd(a,b)
+        self.a = a//gcd
+        self.b = b//gcd
+
+    def __repr__(self):
+        a,b= self.a, self.b
+        return "{} ({},{})".format(a/b,a,b)
+
+    def __add__(self,x):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return rational(self.a*x.b + self.b*x.a,self.b*x.b)
+
+    def __sub__(self,x):
+        assert isinstance(x, self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return rational(self.a*x.b - self.b*x.a,self.b*x.b)
+
+    def __mul__(self,x):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return rational(self.a*x.a,self.b*x.b)
+
+    def __truediv__(self,x):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return rational(self.a*x.b,self.b*x.a)
+
+    def __eq__( self, x ):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return (self.a==x.a) and (self.b==x.b)
+
+    def __gt__( self, x ):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return (self.a*x.b) > (self.b*x.a)
+
+
+    def __ge__( self, x ):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return (self==x) or (self>x)
+
+    def __neg__(self):
+        return rational(-self.a,self.b)
+
+
+
+def analize(val):
+        bytes = pack(">d",val)
+        sign = "+"  if  bytes[0] & 0x80 == 0 else "-"
+        hexp = (bytes[0]&0x7f)<<4
+        lexp = bytes[1]>>4
+        exponent = ( hexp | lexp  )-1023
+        fraction = (int.from_bytes( bytes, byteorder="big" ) & 0xfffffffffffff) | (1<<52)
+        return sign,fraction,exponent
+
+
+def float2rational(val):
+        sign, fraction, exp = analize(val)
+        ans = rational(fraction)/rational(2**52)
+        if exp > 0:
+            ans = ans*rational(2**exp)
+        else:
+            ans = ans/rational(2**(-exp))
+        return ans
+
+
+class int_range:
+
+    def __init__( self, min, max = None ):
+        self.min = min
+        self.max = max if max is not None else min
+
+    def __repr__(self):
+        return "{}:{}".format( self.min,self.max )
+
+    def __add__(self,x):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return int_range(self.min + x.min,self.max+x.max)
+
+    def __sub__(self,x):
+        assert isinstance(x, self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return int_range(self.min - x.max,self.max-x.min)
+
+    def __mul__(self,x):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return int_range(self.min*x.min,self.max*x.max)
+
+    def __truediv__(self,x):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        r = 0 if (self.max%x.max)==0 else 1
+        return int_range( self.min//x.min, r + ( self.max//x.max ) )
+
+    def __neg__(self):
+        return int_range( -self.min, -self.max )
+
+    def __eq__( self, x ):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return ( self.min == x.min ) and ( self.max == x.max )
+
+    def __gt__( self, x ):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return self.min > x.max
+
+    def __ge__( self, x ):
+        assert isinstance(x,self.__class__), "x ({}) is the wrong kind of number".format(x)
+        return ( self > x ) or ( self==x )
+
+sample_seeds_with_errors = [
+      3580,   4629,  13215,  17021,  17904,     21525,  23704,  26384,  27094,  27887,
+     30342,  33244,  34711,  35383,  35707,     43384,  48599,  49128,  52971,  53517,
+     54240,  60141,  66655,  70258,  72242,     73524,  75163,  77345,  82748,  83942,
+     85044,  89793,  90414,  92237,  94245,     99507,  99924, 101037, 101192, 101739,
+    104034, 104534, 105278, 106352, 111612,    112552, 113007, 117535, 117537, 118395,
+    124074, 124108, 125323, 125888, 126091,    129830, 135922, 136465, 139749, 142108,
+    146201, 149877, 150163, 150335, 155928,    159884, 160726, 161717, 171879, 176062,
+    176713, 184918, 185634, 188090, 196885,    197560, 197715, 200413, 202416, 205114,
+    213081, 214380, 214929, 223082, 225294,    229645, 232362, 233448, 240591, 243309,
+    250660, 254715, 259835, 260710, 263502,    273743, 275909, 276834, 284086, 287844,
+    288127, 289314, 299747, 301132, 302004,    304437, 306062, 307212, 309281, 314300,
+    315861, 321317, 322598, 324864, 325702,    328278, 334935, 338631, 338827, 338979,
+    340354, 341786, 347224, 348287, 352123,    352770, 353242, 357759, 361012, 363584,
+    364497, 366670, 369678, 373800, 379912,    385197, 391592, 403884, 405839, 409569,
+    415699, 419074, 424134, 424530, 425055,    427402, 427755, 429276, 429920, 432280,
+    434696, 435117, 439841, 440607, 442864,    449348, 452062, 461284, 462346, 466572,
+    477662, 479390, 479587, 479926, 486865,    488276, 491523, 492787, 492848, 494214,
+    496730, 497850, 498618, 508447, 509306,    510835, 511397, 519596, 522496, 522747,
+    524273, 526122, 531459, 531484, 532119,    538335, 539135, 541820, 543763, 548137,
+    549848, 551589, 552703, 556408, 557070,    559519, 559550, 563374, 568356, 575997,
+    577739, 579098, 581167, 584722, 589770,    592909, 596665, 609587, 614073, 616425,
+    617444, 621678, 622357, 623129, 623920,    629377, 631818, 635435, 637614, 640704,
+    642475, 642570, 646511, 648037, 652809,    656346, 663553, 669058, 670857, 671212,
+    677894, 679160, 679397, 682007, 683876,    689472, 701046, 702264, 703818, 707880,
+    707942, 709563, 711011, 712887, 714914,    718760, 719224, 722539, 722747, 725509,
+    726443, 727710, 732455, 741332, 742883,    743444, 746441, 748181, 748429, 751258,
+    752752, 753309, 756402, 760540, 764172,    764980, 766247, 767815, 770807, 776877,
+    778620, 779630, 781459, 785532, 792227,    794653, 797241, 798629, 798643, 799448,
+    802615, 807570, 808550, 810727, 811336,    813192, 815334, 815499, 815582, 819445,
+    820608, 822298, 822410, 825097, 825989,    828545, 838303, 841776, 844632, 844986,
+    847023, 854342, 855812, 856948, 858892,    860257, 861340, 862226, 862899, 869496,
+    873348, 879966, 885305, 890188, 896359,    904329, 912378, 922335, 924714, 924990,
+    928765, 929601, 931023, 938398, 940604,    947220, 948301, 949478, 950536, 952346,
+    957794, 969578, 971929, 972144, 975622,    977192, 979972, 983091, 985520, 995335,
+    997905, 998906
+]
+
+if __name__ == "__main__":
+    main()
